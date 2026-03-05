@@ -21,8 +21,26 @@ namespace AutomationTestStore.Tests.Pages
 
         public HomePage GoTo(string url)
         {
-            _driver.Navigate().GoToUrl(url);
-            return this;
+            try
+            {
+                _driver.Navigate().GoToUrl(url);
+                return this;
+            }
+            catch (WebDriverException ex)
+            {
+                Console.WriteLine("GoToUrl falló, reintentando... " + ex.Message);
+
+                // Intento de recuperación
+                try
+                {
+                    _driver.Navigate().Refresh();
+                }
+                catch { /* ignore */ }
+
+                // Reintento 1 vez
+                _driver.Navigate().GoToUrl(url);
+                return this;
+            }
         }
 
         private By SearchHeading => By.CssSelector("#content h1, .maintext, .heading1");

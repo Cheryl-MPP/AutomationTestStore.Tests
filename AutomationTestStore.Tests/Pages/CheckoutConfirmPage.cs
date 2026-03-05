@@ -24,49 +24,55 @@ namespace AutomationTestStore.Tests.Pages
 
         public CheckoutSuccessPage ConfirmOrder()
         {
+            // 1) Asegurarnos que estamos en confirm (guest/auth)
+            wait.Until(d =>
+                d.Url.ToLower().Contains("guest_step_3") ||
+                d.Url.ToLower().Contains("checkout/confirm") ||
+                d.Title.ToLower().Contains("checkout confirmation")
+            );
+
+            Console.WriteLine("BEFORE CONFIRM URL: " + _driver.Url);
+            Console.WriteLine("BEFORE CONFIRM TITLE: " + _driver.Title);
+
             var beforeUrl = _driver.Url;
 
-            // 1) Marcar términos si existen
+            // 2) Aceptar términos si aparece
             TryCheckTerms();
 
-            // 2) Click al botón confirm (más específico primero)
-            IWebElement? btn = TryFind(ConfirmBtn1) ?? TryFind(ConfirmBtn2);
+            // 3) Esperar a que exista ALGÚN botón de confirm (sin morir en el primer selector)
+            IWebElement? btn = null;
 
-            if (btn == null)
+            var found = wait.Until(d =>
+            {
+                btn =
+                    d.FindElements(ConfirmBtn1).FirstOrDefault(e => e.Displayed && e.Enabled) ??
+                    d.FindElements(ConfirmBtn2).FirstOrDefault(e => e.Displayed && e.Enabled) ??
+                    d.FindElements(By.Id("checkout_btn")).FirstOrDefault(e => e.Displayed && e.Enabled) ??
+                    d.FindElements(By.CssSelector("button[title*='Confirm'], input[title*='Confirm'], a[title*='Confirm']"))
+                     .FirstOrDefault(e => e.Displayed && e.Enabled);
+
+                return btn != null;
+            });
+
+            if (!found || btn == null)
                 throw new NoSuchElementException("No se encontró el botón de Confirm Order en checkout confirmation.");
 
+            // 4) Scroll + click seguro
             ((IJavaScriptExecutor)_driver).ExecuteScript("arguments[0].scrollIntoView({block:'center'});", btn);
 
-            // Intento 1: click normal
             try { btn.Click(); }
             catch { ((IJavaScriptExecutor)_driver).ExecuteScript("arguments[0].click();", btn); }
 
-            // 3) Esperar a que realmente cambie de pantalla (URL o título)
-            var changed = WaitForCheckoutToFinish(beforeUrl);
-
-            if (!changed)
-            {
-                // Si no cambió, reintentar con submit (a veces el form necesita submit)
-                try { btn.Submit(); } catch { /* ignore */ }
-
-                changed = WaitForCheckoutToFinish(beforeUrl);
-            }
-
-            if (!changed)
-            {
-                // debug útil para vos y el tech lead
-                throw new WebDriverTimeoutException(
-                    $"Se intentó confirmar orden pero no cambió de pantalla. URL={_driver.Url} TITLE={_driver.Title}"
-                );
-            }
+            // 5) Esperar que termine checkout (success)
+            var ok = WaitForCheckoutToFinish(beforeUrl);
+            Assert.That(ok, Is.True, "Se hizo click en Confirm, pero no navegó a Success.");
 
             return new CheckoutSuccessPage(_driver);
         }
 
         private void TryCheckTerms()
         {
-            var cb = _driver.FindElements(TermsCheckbox1).FirstOrDefault()
-                     ?? _driver.FindElements(TermsCheckbox2).FirstOrDefault();
+            var cb = TryFind(TermsCheckbox1) ?? TryFind(TermsCheckbox2);
 
             if (cb != null && !cb.Selected)
             {
@@ -77,8 +83,7 @@ namespace AutomationTestStore.Tests.Pages
 
         private IWebElement? TryFind(By by)
         {
-            var els = _driver.FindElements(by);
-            return els.Count > 0 ? els[0] : null;
+            return _driver.FindElements(by).FirstOrDefault(e => e.Displayed && e.Enabled);
         }
 
         private bool WaitForCheckoutToFinish(string beforeUrl)

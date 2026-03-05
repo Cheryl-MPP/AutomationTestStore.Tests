@@ -1,5 +1,7 @@
 ﻿using OpenQA.Selenium;
 using OpenQA.Selenium.Support.UI;
+using SeleniumExtras.WaitHelpers;
+using System.Globalization;
 
 namespace AutomationTestStore.Tests.Pages
 {
@@ -11,63 +13,89 @@ namespace AutomationTestStore.Tests.Pages
         public CheckoutGuestPage(IWebDriver driver)
         {
             _driver = driver;
-            wait = new WebDriverWait(driver, TimeSpan.FromSeconds(20));
+            wait = new WebDriverWait(driver, TimeSpan.FromSeconds(25));
         }
 
-        // Paso intermedio (a veces aparece)
+        // Página "Account Login" (step antes del guest form)
         private By GuestRadio => By.Id("accountFrm_accountguest");
         private By ContinueAccountBtn => By.CssSelector("button[title='Continue'], input[title='Continue']");
 
-        // Form guest
+        // Guest form (guest_step_1)
         private By FirstName => By.Id("guestFrm_firstname");
         private By LastName => By.Id("guestFrm_lastname");
         private By Email => By.Id("guestFrm_email");
         private By Telephone => By.Id("guestFrm_telephone");
         private By Address1 => By.Id("guestFrm_address_1");
         private By City => By.Id("guestFrm_city");
-        private By Postcode => By.Id("guestFrm_postcode");
         private By Country => By.Id("guestFrm_country_id");
         private By Zone => By.Id("guestFrm_zone_id");
-        private By ContinueGuestBtn => By.CssSelector("button[title='Continue'], input[title='Continue']");
+        private By PostCode => By.Id("guestFrm_postcode");
+
+        private By ContinueGuestBtn => By.CssSelector("button[title='Continue'], input[title='Continue'], #checkout_btn");
 
         public CheckoutConfirmPage FillGuestFormAndContinue()
         {
-            // 1) Si aparece la pantalla para elegir Guest Checkout, la seleccionamos
-            var guestOptions = _driver.FindElements(GuestRadio);
-            if (guestOptions.Count > 0)
-            {
-                var guest = wait.Until(d => d.FindElement(GuestRadio));
-                if (!guest.Selected) guest.Click();
+            // 1) Esperar una de estas situaciones:
+            // - Radio de guest (Account Login)
+            // - Form de guest (guest_step_1)
+            // - Ya estamos en confirm (por algún flow raro)
+            wait.Until(d =>
+                d.FindElements(GuestRadio).Count > 0 ||
+                d.FindElements(FirstName).Count > 0 ||
+                d.Url.ToLower().Contains("checkout/confirm") ||
+                d.Url.ToLower().Contains("guest_step_3")
+            );
 
-                wait.Until(d => d.FindElement(ContinueAccountBtn)).Click();
+            // 2) Si estamos en Account Login, seleccionar Guest y Continue
+            var guestRadio = _driver.FindElements(GuestRadio).FirstOrDefault(e => e.Displayed && e.Enabled);
+            if (guestRadio != null)
+            {
+                try { guestRadio.Click(); }
+                catch { ((IJavaScriptExecutor)_driver).ExecuteScript("arguments[0].click();", guestRadio); }
+
+                var cont = wait.Until(d => d.FindElements(ContinueAccountBtn).FirstOrDefault(e => e.Displayed && e.Enabled));
+                if (cont == null) throw new NoSuchElementException("No se encontró botón Continue en Account Login (guest).");
+
+                try { cont.Click(); }
+                catch { ((IJavaScriptExecutor)_driver).ExecuteScript("arguments[0].click();", cont); }
+
+                // ahora sí debería cargar el guest form
+                wait.Until(ExpectedConditions.ElementExists(FirstName));
             }
 
-            // 2) Ahora sí esperamos el form de guest y lo llenamos
-            wait.Until(d => d.FindElement(FirstName)).SendKeys("Test");
+            // 3) Si ya caímos en confirm, devolvemos confirm directo
+            if (_driver.Url.ToLower().Contains("checkout/confirm") || _driver.Url.ToLower().Contains("guest_step_3"))
+                return new CheckoutConfirmPage(_driver);
+
+            // 4) Llenar guest form (ya estamos en guest_step_1)
+            string random = Guid.NewGuid().ToString("N")[..6];
+
+            wait.Until(ExpectedConditions.ElementIsVisible(FirstName)).SendKeys("Test");
             _driver.FindElement(LastName).SendKeys("User");
-            _driver.FindElement(Email).SendKeys($"test{DateTime.Now:HHmmss}@mail.com");
+            _driver.FindElement(Email).SendKeys($"test{random}@mail.com");
             _driver.FindElement(Telephone).SendKeys("88888888");
-            _driver.FindElement(Address1).SendKeys("San Jose");
+            _driver.FindElement(Address1).SendKeys("Test Address");
             _driver.FindElement(City).SendKeys("San Jose");
-            _driver.FindElement(Postcode).SendKeys("11501");
 
             new SelectElement(_driver.FindElement(Country)).SelectByText("Costa Rica");
+            new SelectElement(_driver.FindElement(Zone)).SelectByIndex(1);
 
-            // Esperar a que cargue Zone
-            wait.Until(d => d.FindElement(Zone));
-            var zone = new SelectElement(_driver.FindElement(Zone));
-            if (zone.Options.Count > 1) zone.SelectByIndex(1);
+            _driver.FindElement(PostCode).SendKeys("1000");
 
-            wait.Until(d => d.FindElement(ContinueGuestBtn)).Click();
+            // 5) Continue al siguiente paso
+            var continueBtn = wait.Until(d => d.FindElements(ContinueGuestBtn).FirstOrDefault(e => e.Displayed && e.Enabled));
+            if (continueBtn == null) throw new NoSuchElementException("No se encontró botón Continue en Guest Checkout.");
+
+            try { continueBtn.Click(); }
+            catch { ((IJavaScriptExecutor)_driver).ExecuteScript("arguments[0].click();", continueBtn); }
+
+            // 6) Esperar confirm (guest_step_3 o checkout/confirm)
+            wait.Until(d =>
+                d.Url.ToLower().Contains("guest_step_3") ||
+                d.Url.ToLower().Contains("checkout/confirm")
+            );
 
             return new CheckoutConfirmPage(_driver);
-        }
-
-        public bool IsGuestFlowVisible()
-        {
-            // Si existe el radio guest o el formulario guest, estamos en guest flow
-            return _driver.FindElements(By.Id("accountFrm_accountguest")).Count > 0
-                || _driver.FindElements(By.Id("guestFrm_firstname")).Count > 0;
         }
     }
 }

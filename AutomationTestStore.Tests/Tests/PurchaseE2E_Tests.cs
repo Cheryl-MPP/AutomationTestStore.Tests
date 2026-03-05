@@ -2,11 +2,13 @@
 using OpenQA.Selenium;
 using OpenQA.Selenium.Chrome;
 using OpenQA.Selenium.Support.UI;
+using NUnit.Framework;
 
 namespace AutomationTestStore.Tests.Tests
 {
+    [NonParallelizable]
     [TestFixture]
-    public class PurchaseE2E_Tests
+    public class PurchaseE2E_Tests : BaseTest
     {
         private IWebDriver? _driver;
         private const string BaseUrl = "https://automationteststore.com/";
@@ -42,6 +44,7 @@ namespace AutomationTestStore.Tests.Tests
         }
 
         [Test]
+        [Category("Purchase")]
         public void Purchase_Product_GuestCheckout_ShouldSucceed()
         {
             var home = new HomePage(_driver!)
@@ -87,7 +90,7 @@ namespace AutomationTestStore.Tests.Tests
                 "No se detectó mensaje de éxito en la página."
             );
         }
-        //Falso negrativo : sabemos que no hay productos con ese nombre,
+        //Falso negativo : sabemos que no hay productos con ese nombre,
         //pero validamos que sí existan resultados (aunque no existan)
         [Test]
         [Category("Negative-Demo")]
@@ -109,6 +112,8 @@ namespace AutomationTestStore.Tests.Tests
 
 
         [Test]
+        [Category("Register")]
+        [Category("NewUser")]
         public void Register_NewUser_ShouldSucceed()
         {
             _driver!.Navigate().GoToUrl("https://automationteststore.com/");
@@ -162,6 +167,8 @@ namespace AutomationTestStore.Tests.Tests
 
 
         [Test]
+        [Category("Login")]
+        [Category("OldUser")]
         public void Login_RegisteredUser_ShouldSucceed()
         {
             _driver!.Navigate().GoToUrl("https://automationteststore.com/");
@@ -183,6 +190,8 @@ namespace AutomationTestStore.Tests.Tests
         }
 
         [Test]
+        [Category("Purchase")]
+        [Category("OldUser")]
         public void Purchase_Product_AuthenticatedUser_ShouldSucceed()
         {
             // 1) Login con usuario registrado
@@ -211,13 +220,14 @@ namespace AutomationTestStore.Tests.Tests
             // Si por alguna razón aparece Guest (depende del sitio), se llena el guest form.
             // Si no aparece Guest, vamos directo a confirmación.
             CheckoutConfirmPage confirm;
-            if (checkout.IsGuestFlowVisible())
+
+            try
             {
                 confirm = checkout.FillGuestFormAndContinue();
             }
-            else
+            catch
             {
-                confirm = new CheckoutConfirmPage(_driver);
+                confirm = new CheckoutConfirmPage(_driver!);
             }
 
             Console.WriteLine("AUTH BEFORE CONFIRM URL: " + _driver.Url);
@@ -239,6 +249,8 @@ namespace AutomationTestStore.Tests.Tests
         }
 
         [Test]
+        [Category("PurchaseMultiple")]
+        [Category("OldUser")]
         public void Purchase_MultipleProducts_AuthenticatedUser_ShouldSucceed()
         {
             // 1) Login primero (esto evita que checkout mande a account/login)
@@ -295,6 +307,8 @@ namespace AutomationTestStore.Tests.Tests
         }
 
         [Test]
+        [Category("Cart")]
+        [Category("OldUser")]
         public void Cart_UpdateQuantity_RemoveProduct_ValidateTotals_ShouldSucceed()
         {
             // 1) Login (para que no te mande a account/login en checkout/cart)
@@ -457,6 +471,7 @@ namespace AutomationTestStore.Tests.Tests
         }
 
         [Test]
+        [Category("Cart")]
         public void Cart_RemoveProduct_ShouldLeaveCartEmpty()
         {
             var home = new HomePage(_driver!)
@@ -471,6 +486,24 @@ namespace AutomationTestStore.Tests.Tests
             cart.RemoveFirstItem();
 
             Assert.That(cart.IsCartEmpty(), Is.True, "El carrito no quedó vacío luego de eliminar el producto.");
+        }
+
+        [Test]
+        [Category("Navigation")]
+        public void Category_Navigation_And_ProductDetails_ShouldSucceed()
+        {
+            var category = new CategoryPage(_driver!)
+                .GoToHome(BaseUrl)
+                .OpenCategoryByText("Skincare");
+
+            var product = category.OpenFirstProductFromCategory();
+
+            var productName = product.GetName();
+
+            Console.WriteLine("PRODUCT NAME: " + productName);
+
+            Assert.That(productName, Is.Not.Empty,
+                "No se pudo obtener el nombre del producto.");
         }
     }
 }

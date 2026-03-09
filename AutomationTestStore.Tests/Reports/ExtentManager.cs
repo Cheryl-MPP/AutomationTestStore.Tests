@@ -16,18 +16,23 @@ namespace AutomationTestStore.Tests.Reports
             {
                 if (_extent == null)
                 {
-                    var reportDir = Path.Combine(AppContext.BaseDirectory, "TestResults");
+                    var reportDir = Path.Combine(AppContext.BaseDirectory, "TestResults", "ExtentReports");
                     Directory.CreateDirectory(reportDir);
 
-                    var reportPath = Path.Combine(reportDir, "ExtentReport.html");
+                    var fileName = $"ExtentReport_{DateTime.Now:yyyyMMdd_HHmmss}.html";
+                    var reportPath = Path.Combine(reportDir, fileName);
 
                     var spark = new ExtentSparkReporter(reportPath);
+
+                    spark.Config.DocumentTitle = "Automation Test Report";
+                    spark.Config.ReportName = "Selenium NUnit Execution Report";
 
                     _extent = new ExtentReports();
                     _extent.AttachReporter(spark);
 
                     _extent.AddSystemInfo("Framework", ".NET + NUnit + Selenium");
                     _extent.AddSystemInfo("Browser", "Chrome");
+                    _extent.AddSystemInfo("Environment", "QA");
                 }
             }
 

@@ -4,18 +4,18 @@ namespace AutomationTestStore.Tests.Utils
 {
     public static class ScreenshotHelper
     {
-        public static string Capture(IWebDriver driver, string fileNamePrefix = "screenshot")
+        public static string Capture(IWebDriver driver, string testName)
         {
-            var dir = Path.Combine(AppContext.BaseDirectory, "TestResults", "Screenshots");
-            Directory.CreateDirectory(dir);
+            var screenshotsDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "TestResults", "Screenshots");
+            Directory.CreateDirectory(screenshotsDir);
 
-            var fileName = $"{fileNamePrefix}_{DateTime.Now:yyyyMMdd_HHmmss}.png";
-            var path = Path.Combine(dir, fileName);
+            var safeName = string.Join("_", testName.Split(Path.GetInvalidFileNameChars()));
+            var filePath = Path.Combine(screenshotsDir, $"{safeName}_{DateTime.Now:yyyyMMdd_HHmmss}.png");
 
             var screenshot = ((ITakesScreenshot)driver).GetScreenshot();
-            screenshot.SaveAsFile(path);
+            screenshot.SaveAsFile(filePath);
 
-            return path;
+            return filePath;
         }
     }
 }

@@ -1,8 +1,8 @@
 ﻿using AutomationTestStore.Tests.Drivers;
 using AutomationTestStore.Tests.Reports;
 using AutomationTestStore.Tests.Utils;
-using AventStack.ExtentReports;
 using NUnit.Framework;
+using NUnit.Framework.Interfaces;
 using OpenQA.Selenium;
 
 namespace AutomationTestStore.Tests.Tests
@@ -12,36 +12,29 @@ namespace AutomationTestStore.Tests.Tests
         protected IWebDriver Driver => DriverFactory.Driver;
 
         private const string BaseUrl = "https://automationteststore.com/";
+        private int _stepCounter;
 
         [OneTimeSetUp]
         public void GlobalSetup()
         {
-            // 1) Inicializa driver UNA vez por clase (más rápido)
-            DriverFactory.InitDriver();
-
-            // 2) Inicializa reporte UNA vez
+            // Inicializa reporte una sola vez por clase
             _ = ExtentManager.GetExtent();
         }
 
         [SetUp]
         public void BaseSetUp()
         {
+            // Inicializa driver nuevo para cada test
+            DriverFactory.InitDriver();
+
+            // Reinicia contador de pasos
+            _stepCounter = 1;
+
             // Crea el test en el reporte
             ExtentTestManager.StartTest(TestContext.CurrentContext.Test.Name);
 
-            // Reset rápido entre tests para evitar "contaminación"
-            try
-            {
-                Driver.Manage().Cookies.DeleteAllCookies();
-            }
-            catch { /* por si el driver está en una pantalla rara */ }
-
-            // Volver al home antes de cada test
-            try
-            {
-                Driver.Navigate().GoToUrl(BaseUrl);
-            }
-            catch { }
+            // Ir al home antes de cada test
+            Driver.Navigate().GoToUrl(BaseUrl);
         }
 
         [TearDown]
@@ -49,38 +42,86 @@ namespace AutomationTestStore.Tests.Tests
         {
             var test = ExtentTestManager.GetTest();
             var outcome = TestContext.CurrentContext.Result.Outcome.Status;
+            var message = TestContext.CurrentContext.Result.Message;
+            var stackTrace = TestContext.CurrentContext.Result.StackTrace;
 
-            if (outcome == NUnit.Framework.Interfaces.TestStatus.Passed)
+            try
             {
-                test.Pass("PASS");
-            }
-            else if (outcome == NUnit.Framework.Interfaces.TestStatus.Failed)
-            {
-                test.Fail(TestContext.CurrentContext.Result.Message);
-
-                try
+                if (outcome == TestStatus.Passed)
                 {
-                    var path = ScreenshotHelper.Capture(Driver, TestContext.CurrentContext.Test.Name);
-                    test.AddScreenCaptureFromPath(path);
+                    test.Pass("Test completed successfully.");
                 }
-                catch { }
-            }
-            else if (outcome == NUnit.Framework.Interfaces.TestStatus.Skipped)
-            {
-                test.Skip("SKIPPED");
-            }
+                else if (outcome == TestStatus.Failed)
+                {
+                    test.Fail(message);
 
-            // OJO: ya NO cerramos driver aquí (para que sea rápido)
+                    if (!string.IsNullOrWhiteSpace(stackTrace))
+                    {
+                        test.Fail(stackTrace);
+                    }
+
+                    try
+                    {
+                        var path = ScreenshotHelper.Capture(
+                            Driver,
+                            TestContext.CurrentContext.Test.Name
+                        );
+
+                        Console.WriteLine("SCREENSHOT PATH: " + path);
+                        test.AddScreenCaptureFromPath(path);
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine("ERROR CAPTURANDO SCREENSHOT: " + ex.Message);
+                        test.Warning("No se pudo capturar screenshot: " + ex.Message);
+                    }
+                }
+                else if (outcome == TestStatus.Skipped)
+                {
+                    test.Skip("Test skipped.");
+                }
+                else
+                {
+                    test.Warning("Estado de prueba no identificado.");
+                }
+            }
+            finally
+            {
+                ExtentManager.Flush();
+                DriverFactory.QuitDriver();
+            }
         }
 
         [OneTimeTearDown]
         public void GlobalTeardown()
         {
-            // Cierra driver una sola vez al final
-            DriverFactory.QuitDriver();
-
-            // Flush una sola vez al final
             ExtentManager.Flush();
+        }
+
+        protected void LogStep(string message)
+        {
+            string stepMessage = $"STEP {_stepCounter} - {message}";
+            ExtentTestManager.GetTest().Info(stepMessage);
+            TestContext.Progress.WriteLine(stepMessage);
+            _stepCounter++;
+        }
+
+        protected void LogInfo(string message)
+        {
+            ExtentTestManager.GetTest().Info(message);
+            TestContext.Progress.WriteLine(message);
+        }
+
+        protected void LogPass(string message)
+        {
+            ExtentTestManager.GetTest().Pass(message);
+            TestContext.Progress.WriteLine(message);
+        }
+
+        protected void LogFail(string message)
+        {
+            ExtentTestManager.GetTest().Fail(message);
+            TestContext.Progress.WriteLine(message);
         }
     }
 }

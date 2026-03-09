@@ -1,7 +1,7 @@
 ﻿using OpenQA.Selenium;
 using OpenQA.Selenium.Support.UI;
 using SeleniumExtras.WaitHelpers;
-using System.Globalization;
+using System.Threading;
 
 namespace AutomationTestStore.Tests.Pages
 {
@@ -33,12 +33,9 @@ namespace AutomationTestStore.Tests.Pages
 
         private By ContinueGuestBtn => By.CssSelector("button[title='Continue'], input[title='Continue'], #checkout_btn");
 
+
         public CheckoutConfirmPage FillGuestFormAndContinue()
         {
-            // 1) Esperar una de estas situaciones:
-            // - Radio de guest (Account Login)
-            // - Form de guest (guest_step_1)
-            // - Ya estamos en confirm (por algún flow raro)
             wait.Until(d =>
                 d.FindElements(GuestRadio).Count > 0 ||
                 d.FindElements(FirstName).Count > 0 ||
@@ -46,7 +43,6 @@ namespace AutomationTestStore.Tests.Pages
                 d.Url.ToLower().Contains("guest_step_3")
             );
 
-            // 2) Si estamos en Account Login, seleccionar Guest y Continue
             var guestRadio = _driver.FindElements(GuestRadio).FirstOrDefault(e => e.Displayed && e.Enabled);
             if (guestRadio != null)
             {
@@ -54,20 +50,18 @@ namespace AutomationTestStore.Tests.Pages
                 catch { ((IJavaScriptExecutor)_driver).ExecuteScript("arguments[0].click();", guestRadio); }
 
                 var cont = wait.Until(d => d.FindElements(ContinueAccountBtn).FirstOrDefault(e => e.Displayed && e.Enabled));
-                if (cont == null) throw new NoSuchElementException("No se encontró botón Continue en Account Login (guest).");
+                if (cont == null)
+                    throw new NoSuchElementException("No se encontró botón Continue en Account Login (guest).");
 
                 try { cont.Click(); }
                 catch { ((IJavaScriptExecutor)_driver).ExecuteScript("arguments[0].click();", cont); }
 
-                // ahora sí debería cargar el guest form
                 wait.Until(ExpectedConditions.ElementExists(FirstName));
             }
 
-            // 3) Si ya caímos en confirm, devolvemos confirm directo
             if (_driver.Url.ToLower().Contains("checkout/confirm") || _driver.Url.ToLower().Contains("guest_step_3"))
                 return new CheckoutConfirmPage(_driver);
 
-            // 4) Llenar guest form (ya estamos en guest_step_1)
             string random = Guid.NewGuid().ToString("N")[..6];
 
             wait.Until(ExpectedConditions.ElementIsVisible(FirstName)).SendKeys("Test");
@@ -77,19 +71,70 @@ namespace AutomationTestStore.Tests.Pages
             _driver.FindElement(Address1).SendKeys("Test Address");
             _driver.FindElement(City).SendKeys("San Jose");
 
-            new SelectElement(_driver.FindElement(Country)).SelectByText("Costa Rica");
-            new SelectElement(_driver.FindElement(Zone)).SelectByIndex(1);
+            // Country
+            var countryElement = wait.Until(ExpectedConditions.ElementToBeClickable(Country));
+            var countrySelect = new SelectElement(countryElement);
+            countrySelect.SelectByText("Costa Rica");
+
+            // Zone / State con reintentos robustos contra stale o refresh AJAX
+            bool zoneSelected = false;
+
+            for (int attempt = 1; attempt <= 5 && !zoneSelected; attempt++)
+            {
+                try
+                {
+                    Thread.Sleep(1000);
+
+                    var zoneElement = wait.Until(d =>
+                    {
+                        try
+                        {
+                            var el = d.FindElement(Zone);
+                            return (el.Displayed && el.Enabled) ? el : null;
+                        }
+                        catch (StaleElementReferenceException)
+                        {
+                            return null;
+                        }
+                        catch (NoSuchElementException)
+                        {
+                            return null;
+                        }
+                    });
+
+                    if (zoneElement == null)
+                        continue;
+
+                    var zoneSelect = new SelectElement(zoneElement);
+
+                    if (zoneSelect.Options.Count > 1)
+                    {
+                        zoneSelect.SelectByIndex(1);
+                        zoneSelected = true;
+                    }
+                }
+                catch (StaleElementReferenceException)
+                {
+                    // reintentar
+                }
+                catch (WebDriverTimeoutException)
+                {
+                    // reintentar
+                }
+            }
+
+            if (!zoneSelected)
+                throw new WebDriverTimeoutException("No se pudo seleccionar la provincia/estado del guest checkout.");
 
             _driver.FindElement(PostCode).SendKeys("1000");
 
-            // 5) Continue al siguiente paso
             var continueBtn = wait.Until(d => d.FindElements(ContinueGuestBtn).FirstOrDefault(e => e.Displayed && e.Enabled));
-            if (continueBtn == null) throw new NoSuchElementException("No se encontró botón Continue en Guest Checkout.");
+            if (continueBtn == null)
+                throw new NoSuchElementException("No se encontró botón Continue en Guest Checkout.");
 
             try { continueBtn.Click(); }
             catch { ((IJavaScriptExecutor)_driver).ExecuteScript("arguments[0].click();", continueBtn); }
 
-            // 6) Esperar confirm (guest_step_3 o checkout/confirm)
             wait.Until(d =>
                 d.Url.ToLower().Contains("guest_step_3") ||
                 d.Url.ToLower().Contains("checkout/confirm")

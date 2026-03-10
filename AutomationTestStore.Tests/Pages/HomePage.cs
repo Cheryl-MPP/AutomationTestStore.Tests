@@ -91,8 +91,8 @@ namespace AutomationTestStore.Tests.Pages
 
         public bool HasSearchResults()
         {
-            var products = _driver.FindElements(By.CssSelector(".thumbnail a.prdocutname"));
-            return products.Count > 0;
+            var products = _driver.FindElements(By.CssSelector(".thumbnail a.prdocutname"));//busca elementos de producto en la página
+            return products.Count > 0;//cuenta lo resultados y devuelve true si hay al menos uno, false si no hay resultados
         }
     }
 }

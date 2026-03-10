@@ -6,70 +6,94 @@ using OpenQA.Selenium;
 using OpenQA.Selenium.Chrome;
 using OpenQA.Selenium.Support.UI;
 using System.Buffers.Text;
+using System.Security.Policy;
 
 
 namespace AutomationTestStore.Tests.Tests
 {
-    [NonParallelizable]// dado que algunos tests hacen limpieza de procesos, es mejor no correr en paralelo para evitar conflictos. Si se quiere paralelizar, habría que aislar aún más el driver y la limpieza.
-    [TestFixture]// esta clase es para tests de compra E2E, pero también incluye algunos tests relacionados a navegación, registro y carrito para aprovechar el setup común. Se pueden mover a otras clases si se quiere.
+    [NonParallelizable]
+    // dado que algunos tests hacen limpieza
+    // de procesos, es mejor no correr en paralelo
+    // para evitar conflictos. Si se quiere paralelizar,
+    // habría que aislar aún más el driver y la limpieza.
+    [TestFixture]
+    // esta clase es para tests de compra E2E, pero
+    // también incluye algunos tests relacionados a
+    // navegación, registro y carrito para aprovechar
+    // el setup común. Se pueden mover a otras clases
+    // si se quiere.
     public class PurchaseE2E_Tests : BaseTest
     {
+        //Este test automatiza el proceso completo
+        //de compra de un producto como usuario
+        //invitado en la tienda Automation Test
+        //Store y valida que la orden se complete
+        //correctamente.
 
         [Test]
         [Category("Purchase")]
         public void Purchase_Product_GuestCheckout_ShouldSucceed()
         {
+            //Un usuario puede buscar un producto
             LogStep("Search product 'shampoo' from homepage");
 
             var home = new HomePage(Driver!)
                 .GoTo(TestConfig.Instance.BaseUrl)
                 .Search("shampoo");
 
-            LogInfo("URL: " + Driver!.Url);
-            LogInfo("TITLE: " + Driver!.Title);
+            LogInfo("URL: " + Driver!.Url);//URL actual después de la búsqueda
+            LogInfo("TITLE: " + Driver!.Title);//título de la página
 
-            LogStep("Open first product from search results");
+            LogStep("Open first product from search results");//abre el primer producto de la lista
 
-            var product = home.OpenFirstProduct();
+            var product = home.OpenFirstProduct();//Simula cuando un usuario hace click en el primer resultado.
+            //Agregarlo al carrito
+            LogStep("Add product to cart");//Agrega el producto al carrito desde la página de detalles del producto.
 
-            LogStep("Add product to cart");
-
-            var cart = product.AddToCart();
+            var cart = product.AddToCart();//Valida que el carrito se muestre correctamente después de agregar el producto.
 
             LogStep("Validate cart is visible");
 
-            Assert.That(cart.IsCartVisible(), Is.True, "El carrito no se ve");
+            Assert.That(cart.IsCartVisible(), Is.True, "El carrito no se ve");//Valida que el carrito realmente esté visible.
 
             LogPass("Cart displayed successfully.");
-
+            //Proceder al checkout
             LogStep("Proceed to checkout");
 
-            var checkout = cart.ProceedToCheckout();
-
+            var checkout = cart.ProceedToCheckout();//Simula cuando el usuario hace click en: Checkout y el
+                                                    //sistema abre la página de checkout.
+            //Completar el formulario como invitado
             LogStep("Fill guest checkout form");
 
-            var confirm = checkout.FillGuestFormAndContinue();
+            var confirm = checkout.FillGuestFormAndContinue();//Aquí llenamos el form y luego press continue 
+            //lo cual permite que comprar como invitado/guest
 
-            LogInfo("BEFORE CONFIRM URL: " + Driver!.Url);
-            LogInfo("BEFORE CONFIRM TITLE: " + Driver!.Title);
-
+            LogInfo("BEFORE CONFIRM URL: " + Driver!.Url);//confirma el navegador 
+            LogInfo("BEFORE CONFIRM TITLE: " + Driver!.Title);//si realmente llegó al paso de confirmación del checkout.
+            //Confirma la orden
             LogStep("Confirm order");
 
-            var success = confirm.ConfirmOrder();
+            var success = confirm.ConfirmOrder();//procesa la compra y redirige a la pagina de success
 
             LogInfo("AFTER CONFIRM URL: " + Driver!.Url);
             LogInfo("AFTER CONFIRM TITLE: " + Driver!.Title);
 
             LogStep("Validate checkout confirmation step finished");
-
+            //aquí este método valida que no se haya quedado atascado
+            //en el paso de confirmación del checkout, lo cual
+            //indicaría que la orden no se completó correctamente.
             Assert.That(
                 Driver!.Url,
-                Does.Not.Contain("guest_step_3"),
+                Does.Not.Contain("guest_step_3"),//significa que la orden no se completó.
                 "Se quedó en Checkout Confirmation; no se completó la orden."
             );
-
+            //Llegar a la página de éxito
             LogStep("Validate success URL");
 
+            //en todo este método se validan varias URLs posibles de éxito, porque dependiendo del
+            //flujo puede variar la URL final. Lo importante es validar que se detecte alguna URL
+            //de éxito, para confirmar porque puede ser success, checkout/success guest_step_4o guest_step_4/5
+            //dependiendo del flujo.
             Assert.That(
                 Driver!.Url.ToLowerInvariant(),
                 Does.Contain("success")
@@ -83,8 +107,11 @@ namespace AutomationTestStore.Tests.Tests
 
             LogStep("Validate success message on page");
 
-            var successText = success.GetSuccessText().ToLowerInvariant();
+            var successText = success.GetSuccessText().ToLowerInvariant();// valida que la web muestre Thank you!
+            // Your order has been successfully processed!
 
+
+            //Esto confirma que en la página aparece un mensaje de confirmación de compra.
             Assert.That(
                 successText,
                 Does.Contain("success")
@@ -95,70 +122,97 @@ namespace AutomationTestStore.Tests.Tests
             );
 
             LogPass("Guest checkout completed successfully.");
-        }
+        }//Si todo pasó: El test registra en el reporte que el checkout fue exitoso.
 
         //Falso negativo : sabemos que no hay productos con ese nombre,
         //pero validamos que sí existan resultados (aunque no existan)
         [Test]
         [Category("Negative-Demo")]
         public void Search_ProductNotFound_ShouldFail()
-        {
+        { 
             LogStep("Open Automation Test Store homepage");
 
-            var home = new HomePage(Driver!)
-                .GoTo(TestConfig.Instance.BaseUrl);
+            var home = new HomePage(Driver!)//crea el pom de la web y
+                .GoTo(TestConfig.Instance.BaseUrl);//Abre la página principal de la tienda.
 
-            LogStep("Search for a non-existing product");
-
+            LogStep("Search for a non-existing product");//Realizamos la búsqueda lamborghini12345 producto que no existe
+            //se  muestran 0 resultados, pero el test espera que sí haya resultados,
+            //lo cual fuerza un falso negativo para validar que el reporte muestre
+            //el error y capture la pantalla correctamente.
             home = home.Search("lamborghini12345");
 
-            LogInfo("NEGATIVE URL: " + Driver!.Url);
-            LogInfo("NEGATIVE TITLE: " + Driver!.Title);
+            LogInfo("NEGATIVE URL: " + Driver!.Url);//URL después de la búsqueda
+            LogInfo("NEGATIVE TITLE: " + Driver!.Title);//título de la página después de la búsqueda
 
-            LogStep("Validate search results");
+            LogStep("Validate search results");//¿La búsqueda devolvió productos?
 
-            var hasResults = home.HasSearchResults();
+            var hasResults = home.HasSearchResults();//Valida si la búsqueda mostró resultados.
+                                                     //En este caso, como el producto no existe,
+                                                     //debería ser false, pero el test espera que
+                                                     //sea true, lo cual fuerza un error para
+                                                     //validar el reporte.
 
-            LogStep("Force failure to validate reporting and screenshot");
-
-            Assert.That(hasResults, Is.True,
-                "Escenario negativo: no se encontraron productos para la búsqueda.");
+            LogStep("Force failure to validate reporting and screenshot");//El test dice:¡Esperamos que haya resultados!
+            Assert.That(hasResults, Is.True,//pero...
+                "Escenario negativo: no se encontraron productos para la búsqueda.");//nada de resultados false y el test falla
         }
 
-        [Test]
-        [Category("Register")]
-        [Category("NewUser")]
+        [Test]//Indica que NUnit debe ejecutar este método como un caso de prueba.
+        [Category("Register")]//Clasifica el test como parte del módulo de registro.
+        [Category("NewUser")]//Indica que es específicamente un caso de usuario nuevo.
         public void Register_NewUser_ShouldSucceed()
         {
-            LogStep("Open Automation Test Store homepage");
-            Driver!.Navigate().GoToUrl("https://automationteststore.com/");
+            LogStep("Open Automation Test Store homepage");//Abre la página principal del sitio web.
+            Driver!.Navigate().GoToUrl("https://automationteststore.com/");//Simula al usuario entrando manualmente
+                                                                           //al sitio para iniciar el proceso.
 
             LogStep("Open login or register page");
-            Driver.FindElement(By.LinkText("Login or register")).Click();
+            Driver.FindElement(By.LinkText("Login or register")).Click();//busca el enlace de "Login or register" y
+                                                                         //hace click para abrir la página de
+                                                                         //login/registro.
 
             LogStep("Click continue to open registration form");
-            Driver.FindElement(By.CssSelector("button[title='Continue']")).Click();
+            Driver.FindElement(By.CssSelector("button[title='Continue']")).Click();//Presiona el botón Continue
+                                                                                   //para abrir el formulario de
+                                                                                   //registro de nuevo usuario.
+                                                                                   //O sea, no entra por login,
+                                                                                   //sino por la opción de crear
+                                                                                   //cuenta.
 
             LogStep("Wait for registration form to be visible");
-            var wait = new WebDriverWait(Driver, TimeSpan.FromSeconds(20));
-            wait.Until(d => d.FindElements(By.Id("AccountFrm_firstname")).Count > 0);
-
+            var wait = new WebDriverWait(Driver, TimeSpan.FromSeconds(20));//Aquí se crea una espera explícita
+                                                                           //de hasta 20 segundos.
+            wait.Until(d => d.FindElements(By.Id("AccountFrm_firstname")).Count > 0);//Luego el test espera hasta
+                                                                                     //que aparezca el campo:
+                                                                                     //AccountFrm_firstname
+                                                                                     //Eso significa que el formulario
+                                                                                     //ya cargó y está listo para usarse.
+            
+            //Aquí Genera una cadena aleatoria de 6 caracteres usando Guid.
             LogStep("Generate random user data to avoid duplicates");
-            string random = Guid.NewGuid().ToString("N").Substring(0, 6);
+            string random = Guid.NewGuid().ToString("N").Substring(0, 6);//guid ejm-> a4f9c2
+                                                                         //Esto se hace para evitar conflictos con usuarios
+                                                                         //ya existentes en la base de datos de la tienda,
+                                                                         //ya que el test crea un nuevo usuario
+                                                                         //en cada ejecución.
 
-            LogStep("Fill registration form");
+            LogStep("Fill registration form");//completamos el form
             Driver.FindElement(By.Id("AccountFrm_firstname")).SendKeys("Test");
             Driver.FindElement(By.Id("AccountFrm_lastname")).SendKeys("User");
-            Driver.FindElement(By.Id("AccountFrm_email")).SendKeys($"test{random}@mail.com");
+            Driver.FindElement(By.Id("AccountFrm_email")).SendKeys($"test{random}@mail.com");//correo único usando la cadena aleatoria
             Driver.FindElement(By.Id("AccountFrm_telephone")).SendKeys("88888888");
             Driver.FindElement(By.Id("AccountFrm_address_1")).SendKeys("Test Address");
             Driver.FindElement(By.Id("AccountFrm_city")).SendKeys("San Jose");
 
+            //acá esperamos que el dropdown de país sea clickeable
             LogStep("Select country");
             var countryElement = wait.Until(SeleniumExtras.WaitHelpers.ExpectedConditions.ElementToBeClickable(By.Id("AccountFrm_country_id")));
-            var countrySelect = new SelectElement(countryElement);
-            countrySelect.SelectByText("Costa Rica");
+            var countrySelect = new SelectElement(countryElement);//Crea un objeto SelectElement
+            countrySelect.SelectByText("Costa Rica");//Selecciona "Costa Rica" del dropdown de país.
+            // usa SelectElement porque es un combo box /select HTML  u no un input normal
 
+            //Cuando se selecciona un país, el dropdown de provincia
+            //o estado suele recargarse dinámicamente.
             LogStep("Wait for province/state dropdown to refresh");
             wait.Until(d =>
             {
@@ -168,49 +222,77 @@ namespace AutomationTestStore.Tests.Tests
                     var options = zone.FindElements(By.TagName("option"));
                     return zone.Displayed && zone.Enabled && options.Count > 1;
                 }
-                catch (StaleElementReferenceException)
+                catch (StaleElementReferenceException) //Eso pasa mucho cuando la página refresca elementos dinámicamente.
                 {
                     return false;
                 }
-                catch (NoSuchElementException)
+                catch (NoSuchElementException)//al igual con esta 
                 {
                     return false;
                 }
-            });
+            });//Este bloque espera hasta que:el dropdown
+               //exista,esté visible,esté habilitado, y 
+               //tenga más de una opción disponible.
+               //Es importante porque si el test intenta
+               //seleccionar provincia demasiado rápido,
+               //puede fallar porque el combo todavía
+               //no se actualiza.
 
-            LogStep("Select province/state");
+            LogStep("Select province/state");//Selecciona una opción del dropdown de provincia/estado.
             var zoneElement = wait.Until(SeleniumExtras.WaitHelpers.ExpectedConditions.ElementToBeClickable(By.Id("AccountFrm_zone_id")));
             var zoneSelect = new SelectElement(zoneElement);
-            zoneSelect.SelectByIndex(1);
+            zoneSelect.SelectByIndex(1);//toma la segunda opción
+                                        //disponible.No selecciona
+                                        //por nombre, sino por posición
+                                        //en la lista.
 
+            //acá se completa el resto del formulario 
+            //randomiza el username también para evitar
+            //conflictos con usuarios existentes user{random} ejm-> usera4f9c2
+            //Así se evita duplicidad de username.
             Driver.FindElement(By.Id("AccountFrm_postcode")).SendKeys("1000");
             Driver.FindElement(By.Id("AccountFrm_loginname")).SendKeys($"user{random}");
             Driver.FindElement(By.Id("AccountFrm_password")).SendKeys("Password123");
             Driver.FindElement(By.Id("AccountFrm_confirm")).SendKeys("Password123");
 
             LogStep("Accept terms and conditions");
-            Driver.FindElement(By.Id("AccountFrm_agree")).Click();
+            Driver.FindElement(By.Id("AccountFrm_agree")).Click();//Marca el checkbox de aceptación
+                                                                  //de términos.Es un *
 
             LogStep("Submit registration");
-            Driver.FindElement(By.CssSelector("button[title='Continue']")).Click();
+            Driver.FindElement(By.CssSelector("button[title='Continue']")).Click();//Presiona el botón Continue para
+                                                                                   //enviar el formulario ya lleno.
 
+            //este bloque del test espera hasta que se cumpla
+            //una de estas dos condiciones:
+            //que la URL contenga account
+            //o que el título de la página contenga account
             LogStep("Wait for successful navigation to account page");
             wait.Until(d =>
                 d.Url.ToLower().Contains("account") ||
                 d.Title.ToLower().Contains("account"));
+            //Eso permite validar la navegación sin depender
+            //de una sola condición. hace el test más flexible
+            //y robusto ante cambios menores en la página.
 
-            LogInfo("FINAL URL: " + Driver.Url);
-            LogInfo("FINAL TITLE: " + Driver.Title);
 
+            //guarda los logs
+            LogInfo("FINAL URL: " + Driver.Url);//la URL final
+            LogInfo("FINAL TITLE: " + Driver.Title);//el título final
+            //Esto ayuda mucho si algo falla y necesitas revisar
+            //en qué página quedó.
+
+
+            //Validar que sí llegó a la cuenta
             LogStep("Validate user was redirected to account page");
             Assert.That(
                 Driver.Url.ToLower(),
-                Does.Contain("account"),
+                Does.Contain("account"),//Comprueba que la URL final contenga la palabra:account
                 "No se navegó a la página de cuenta después del registro."
             );
 
             LogPass("User registration completed successfully.");
-        }
+        } //Si todo salió bien, se registra que el registro del usuario fue exitoso.
 
         [Test]
         [Category("Login")]

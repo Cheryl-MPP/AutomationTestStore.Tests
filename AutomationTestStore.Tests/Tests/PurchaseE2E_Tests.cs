@@ -1,12 +1,7 @@
 ﻿using AutomationTestStore.Tests.Config;
 using AutomationTestStore.Tests.Pages;
-using AutomationTestStore.Tests.Reports;
-using NUnit.Framework;
 using OpenQA.Selenium;
-using OpenQA.Selenium.Chrome;
 using OpenQA.Selenium.Support.UI;
-using System.Buffers.Text;
-using System.Security.Policy;
 
 
 namespace AutomationTestStore.Tests.Tests
@@ -62,7 +57,7 @@ namespace AutomationTestStore.Tests.Tests
 
             var checkout = cart.ProceedToCheckout();//Simula cuando el usuario hace click en: Checkout y el
                                                     //sistema abre la página de checkout.
-            //Completar el formulario como invitado
+                                                    //Completar el formulario como invitado
             LogStep("Fill guest checkout form");
 
             var confirm = checkout.FillGuestFormAndContinue();//Aquí llenamos el form y luego press continue 
@@ -129,7 +124,7 @@ namespace AutomationTestStore.Tests.Tests
         [Test]
         [Category("Negative-Demo")]
         public void Search_ProductNotFound_ShouldFail()
-        { 
+        {
             LogStep("Open Automation Test Store homepage");
 
             var home = new HomePage(Driver!)//crea el pom de la web y
@@ -187,7 +182,7 @@ namespace AutomationTestStore.Tests.Tests
                                                                                      //AccountFrm_firstname
                                                                                      //Eso significa que el formulario
                                                                                      //ya cargó y está listo para usarse.
-            
+
             //Aquí Genera una cadena aleatoria de 6 caracteres usando Guid.
             LogStep("Generate random user data to avoid duplicates");
             string random = Guid.NewGuid().ToString("N").Substring(0, 6);//guid ejm-> a4f9c2
@@ -296,27 +291,37 @@ namespace AutomationTestStore.Tests.Tests
 
         [Test]
         [Category("Login")]
-        [Category("OldUser")]
+        [Category("OldUser")]//Indica que el escenario usa un usuario existente o previamente registrado.
         public void Login_RegisteredUser_ShouldSucceed()
         {
             LogStep("Open Automation Test Store homepage");
 
+            //El navegador se dirige a la página principal del sitio y
+            //esto simula cuando un usuario abre el sitio web antes de iniciar sesión.
             Driver!.Navigate().GoToUrl("https://automationteststore.com/");
 
             LogStep("Open login page");
 
+            //Busca el enlace con el texto:Login or register, hace click, inicia sesión y se registra
             Driver.FindElement(By.LinkText("Login or register")).Click();
 
             LogStep("Enter registered username");
-
+            //Acá encuentra el campo de usuario mediante su id:loginFrm_loginname
+            //y escribe el nombre del usuario registrado: cheryltest123
             Driver.FindElement(By.Id("loginFrm_loginname")).SendKeys("cheryltest123");
 
             LogStep("Enter password");
-
+            //Localiza el campo de contraseña:loginFrm_password
+            //y escribe la contraseña correspondiente.
             Driver.FindElement(By.Id("loginFrm_password")).SendKeys("Password123");
 
             LogStep("Click login button");
-
+            //Busca el botón cuyo atributo title es:Login
+            //y hace clic para enviar el formulario de inicio de sesión.
+            //Esto provoca que el sistema:
+            //1- valide las credenciales
+            //2- cree una sesión
+            //3- redirija al usuario a su cuenta
             Driver.FindElement(By.CssSelector("button[title='Login']")).Click();
 
             LogStep("Validate successful login");
@@ -328,7 +333,16 @@ namespace AutomationTestStore.Tests.Tests
             );
 
             LogPass("Registered user login completed successfully.");
-        }
+        }//Con el método anterior validamos que después de hacer login,
+         //el sistema debería redirigir a la página de cuenta del usuario
+         //el test valida que el título de la página contenga la palabra "account"
+         //si el título no contiene esa palabra, el test falla.
+         //y esto indicaría que: el login no fue exitoso y
+         //que el usuario no fue redirigido correctamente
+         // caso contrario, si la validación pasa,
+         // el test registra en los logs
+         // que el inicio de sesión se
+         // completó correctamente.
 
         [Test]
         [Category("Purchase")]
@@ -337,57 +351,84 @@ namespace AutomationTestStore.Tests.Tests
         {
             LogStep("Open Automation Test Store homepage");
             Driver!.Navigate().GoToUrl(TestConfig.Instance.BaseUrl);
-
+            //se abre el test, se abre la página principal
             LogStep("Open login page");
             Driver.FindElement(By.LinkText("Login or register")).Click();
-
+            //entra al login
             LogStep("Enter registered username");
             Driver.FindElement(By.Id("loginFrm_loginname")).SendKeys("cheryltest123");
+            //escribe usuario
 
-            LogStep("Enter password");
+            LogStep("Enter password");// escribe contraseña y hace click en btn login
             Driver.FindElement(By.Id("loginFrm_password")).SendKeys("Password123");
 
             LogStep("Click login button");
             Driver.FindElement(By.CssSelector("button[title='Login']")).Click();
+            ////acá se prueba que el usuario registrado pueda autenticarse correctamente
 
-            LogStep("Wait for successful login");
+
+            //Buscar y agregar el producto al carrito
+            //Esta parte después del login, el test:
+            //vuelve a la home
+            //busca el producto shampoo
+            //abre el primer resultado
+            //lo agrega al carrito
+            //valida que el carrito sí esté visible
+            //Y prueba que un usuario autenticado 
+            //puede seleccionar un producto y 
+            //llevarlo al carrito.
+            LogStep("Wait for successful login");//Después de hacer login
             var wait = new WebDriverWait(Driver, TimeSpan.FromSeconds(20));
             wait.Until(d =>
-                d.Url.ToLower().Contains("account") ||
-                d.Title.ToLower().Contains("account"));
+                d.Url.ToLower().Contains("account") ||//espera que la URL contenga account
+                d.Title.ToLower().Contains("account"));//y el título también contenga account,
 
-            LogInfo("LOGIN URL: " + Driver.Url);
-            LogInfo("LOGIN TITLE: " + Driver.Title);
+            LogInfo("LOGIN URL: " + Driver.Url);//lo cual confirmaría que el login fue exitoso
+            LogInfo("LOGIN TITLE: " + Driver.Title);//y se redirigió a la página de cuenta.  
 
+            //Luego hace un Assert para confirmar que realmente sí entró.
             Assert.That(
                 Driver.Title.ToLower(),
                 Does.Contain("account"),
                 "No se logró iniciar sesión."
             );
 
-            LogPass("User logged in successfully.");
+            LogPass("User logged in successfully.");//Si el assert pasa, se registra que el login fue exitoso.
 
-            LogStep("Search for product 'shampoo'");
+
+            //Después del login, el test: vuelve a la home
+            LogStep("Search for product 'shampoo'");//busca el producto shampoo
             var home = new HomePage(Driver)
                 .GoTo(TestConfig.Instance.BaseUrl)
                 .Search("shampoo");
 
             LogStep("Open first product");
-            var product = home.OpenFirstProduct();
+            var product = home.OpenFirstProduct();//abre el primer resultado
 
-            LogStep("Add product to cart");
+            LogStep("Add product to cart");//lo agrega al carrito
             var cart = product.AddToCart();
 
-            LogStep("Validate cart is visible");
+            LogStep("Validate cart is visible");//valida que el carrito sí esté visible
             Assert.That(cart.IsCartVisible(), Is.True, "El carrito no se ve");
 
             LogPass("Cart is visible.");
 
             LogStep("Proceed to checkout");
             var checkout = cart.ProceedToCheckout();
+            //Desde el carrito, el test hace clic
+            //en checkout para iniciar el proceso
+            //de compra.
 
+
+            //Aquí el test contempla dos posibles
+            //comportamientos del sistema:
             LogStep("Continue checkout flow");
 
+            //Opción A: aparece un formulario
+            //intermedio Si aparece, el test lo llena con:
+            //checkout.FillGuestFormAndContinue();nombre,
+            //apellido, email, teléfono, dirección, ciudad,
+            //país, provincia y código postal
             CheckoutConfirmPage confirm;
 
             try
@@ -401,10 +442,13 @@ namespace AutomationTestStore.Tests.Tests
                 confirm = new CheckoutConfirmPage(Driver!);
             }
 
+            //Esto guarda evidencia del punto exacto en el que
+            //está el navegador antes de confirmar la orden.
+            //Mas que todo por debugging
             LogInfo("AUTH BEFORE CONFIRM URL: " + Driver.Url);
             LogInfo("AUTH BEFORE CONFIRM TITLE: " + Driver.Title);
 
-            LogStep("Confirm order");
+            LogStep("Confirm order");//Presiona el botón para confirmar la compra.
             var success = confirm.ConfirmOrder();
 
             LogInfo("AUTH AFTER CONFIRM URL: " + Driver.Url);
@@ -412,43 +456,64 @@ namespace AutomationTestStore.Tests.Tests
 
             LogStep("Validate success URL");
 
+            //Después de confirmar, el test valida que la URL
+            //sea la de éxito, lo cual confirmaría que la
+            //orden se completó correctamente.
             Assert.That(
                 Driver.Url.ToLowerInvariant(),
                 Does.Contain("checkout/success").Or.Contain("success"),
                 "No se detectó navegación a página de éxito."
             );
 
-            LogPass("Success URL detected.");
+            //Si el assert anterior pasa, se registra
+            //que se detectó la URL de éxito, lo cual
+            //es un indicador clave de que la compra
+            //se completó correctamente.
+            LogPass("Success URL detected.");//Valida URL
 
             LogStep("Validate success message");
+            //Extrae el texto de la página final
+            //y valida que contenga frases de
+            //compra exitosa, como: your order,
+            //processed, success, thank you, etc.
 
             var successText = success.GetSuccessText().ToLowerInvariant();
 
+            //A partir de aquí, el sistema debería completar
+            //Y finalmente, el test valida que en la página de
+            //éxito aparezca un mensaje de confirmación de compra,
+            //Porque no solo valida la URL, sino también el
+            //contenido visible en pantalla con el assert
             Assert.That(
                 successText,
                 Does.Contain("your order").Or.Contain("processed").Or.Contain("success"),
                 "No se detectó mensaje de éxito en la página."
             );
 
-            LogPass("Order completed successfully.");
+            LogPass("Order completed successfully.");//orden fue completada correctamente.
         }
 
+
         [Test]
-        [Category("PurchaseMultiple")]
-        [Category("OldUser")]
+        [Category("PurchaseMultiple")]//Clasifica el test como compra de múltiples productos.
+        [Category("OldUser")]//Indica que el flujo usa un usuario ya registrado.
         public void Purchase_MultipleProducts_AuthenticatedUser_ShouldSucceed()
         {
             LogStep("Open Automation Test Store homepage");
 
-            Driver!.Navigate().GoToUrl(TestConfig.Instance.BaseUrl);
+            Driver!.Navigate().GoToUrl(TestConfig.Instance.BaseUrl);//Abre la página principal del sitio.
 
             LogStep("Login with registered user");
 
-            Driver.FindElement(By.LinkText("Login or register")).Click();
-            Driver.FindElement(By.Id("loginFrm_loginname")).SendKeys("cheryltest123");
-            Driver.FindElement(By.Id("loginFrm_password")).SendKeys("Password123");
-            Driver.FindElement(By.CssSelector("button[title='Login']")).Click();
+            Driver.FindElement(By.LinkText("Login or register")).Click();//entra al login
+            Driver.FindElement(By.Id("loginFrm_loginname")).SendKeys("cheryltest123");//ingresa usuario
+            Driver.FindElement(By.Id("loginFrm_password")).SendKeys("Password123");//ingresa contraseña
+            Driver.FindElement(By.CssSelector("button[title='Login']")).Click();//presiona Login
 
+
+            //valida que el título de la página contenga
+            //account, lo que indica que el usuario
+            //fue redirigido a su cuenta.
             Assert.That(
                 Driver.Title.ToLower(),
                 Does.Contain("account"),
@@ -457,34 +522,42 @@ namespace AutomationTestStore.Tests.Tests
 
             LogPass("User logged in successfully.");
 
-            LogStep("Search and add first product 'shampoo'");
+            //Aquí vuelve a la página principal
+            LogStep("Search and add first product 'shampoo'");//busca el producto shampoo
 
             var home = new HomePage(Driver)
                 .GoTo(TestConfig.Instance.BaseUrl)
                 .Search("shampoo");
 
-            var product1 = home.OpenFirstProduct();
-            var cart = product1.AddToCart();
+            var product1 = home.OpenFirstProduct();//abre el primer resultado
+            var cart = product1.AddToCart();//lo agrega al carrito
 
+            //Confirma que el carrito aparece correctamente
+            //después de agregar el primer producto.
             Assert.That(
                 cart.IsCartVisible(),
                 Is.True,
                 "El carrito no se ve después del primer producto"
             );
 
+            //Ahora el test repite el proceso con otro producto:
+
             LogPass("First product added to cart.");
 
             LogStep("Search and add second product 'cream'");
 
-            var home2 = new HomePage(Driver)
+            var home2 = new HomePage(Driver)//vuelve a la home
                 .GoTo(TestConfig.Instance.BaseUrl)
-                .Search("cream");
+                .Search("cream");//busca cream
 
-            var product2 = home2.OpenFirstProduct();
+            var product2 = home2.OpenFirstProduct();//abre el primer resultado
             cart = product2.AddToCart();
+            //Esto permite probar un carrito con múltiples productos.
 
+
+            //Confirma que el carrito sigue visible después de agregar el segundo producto.
             Assert.That(
-                cart.IsCartVisible(),
+                cart.IsCartVisible(),//Esto indica que ambos productos fueron agregados correctamente.
                 Is.True,
                 "El carrito no se ve después del segundo producto"
             );
@@ -493,22 +566,27 @@ namespace AutomationTestStore.Tests.Tests
 
             LogStep("Proceed to checkout");
 
-            cart.ProceedToCheckout();
+            cart.ProceedToCheckout();//El test inicia el proceso de compra desde el carrito.
 
-            LogInfo("MULTI AUTH CHECKOUT URL: " + Driver.Url);
-            LogInfo("MULTI AUTH CHECKOUT TITLE: " + Driver.Title);
+            LogInfo("MULTI AUTH CHECKOUT URL: " + Driver.Url);//URL
+            LogInfo("MULTI AUTH CHECKOUT TITLE: " + Driver.Title);//Título
+            //guarda logs, esto ayuda a depurar si algo falla.
 
             LogStep("Confirm order");
 
-            var confirm = new CheckoutConfirmPage(Driver);
+            var confirm = new CheckoutConfirmPage(Driver);//Presiona el botón para confirmar la compra.
 
-            var success = confirm.ConfirmOrder();
+            var success = confirm.ConfirmOrder();//procesa la compra y redirige a la página de éxito.
 
-            LogInfo("MULTI AUTH AFTER CONFIRM URL: " + Driver.Url);
-            LogInfo("MULTI AUTH AFTER CONFIRM TITLE: " + Driver.Title);
+            LogInfo("MULTI AUTH AFTER CONFIRM URL: " + Driver.Url);//URL final
+            LogInfo("MULTI AUTH AFTER CONFIRM TITLE: " + Driver.Title);//título final
+            //después de confirmar la compra.
 
             LogStep("Validate success URL");
 
+            //Valida que la URL contenga algo como:
+            //checkout/success o success, lo cual confirmaría que
+            //la orden se completó correctamente.
             Assert.That(
                 Driver.Url.ToLowerInvariant(),
                 Does.Contain("checkout/success").Or.Contain("success"),
@@ -517,6 +595,12 @@ namespace AutomationTestStore.Tests.Tests
 
             LogStep("Validate success message");
 
+            //Obtiene el texto visible en la página final y
+            //valida que incluya frases como:
+            //your order
+            //processed
+            //success
+            //Esto confirma que la orden fue procesada.
             var successText = success.GetSuccessText().ToLowerInvariant();
 
             Assert.That(
@@ -528,22 +612,29 @@ namespace AutomationTestStore.Tests.Tests
             );
 
             LogPass("Multiple product purchase completed successfully.");
-        }
+        } //Si todo sale bien, el test registra que la compra de múltiples
+          //productos fue exitosa.
 
         [Test]
-        [Category("Cart")]
-        [Category("OldUser")]
+        [Category("Cart")]//pertenece al módulo de carrito.
+        [Category("OldUser")]//usa un usuario ya registrado.
         public void Cart_UpdateQuantity_RemoveProduct_ValidateTotals_ShouldSucceed()
         {
             LogStep("Login with registered user");
 
-            Driver!.Navigate().GoToUrl(TestConfig.Instance.BaseUrl);
+            Driver!.Navigate().GoToUrl(TestConfig.Instance.BaseUrl);//abre el sitio
 
-            Driver.FindElement(By.LinkText("Login or register")).Click();
-            Driver.FindElement(By.Id("loginFrm_loginname")).SendKeys("cheryltest123");
-            Driver.FindElement(By.Id("loginFrm_password")).SendKeys("Password123");
-            Driver.FindElement(By.CssSelector("button[title='Login']")).Click();
+            Driver.FindElement(By.LinkText("Login or register")).Click();//entra a login
+            Driver.FindElement(By.Id("loginFrm_loginname")).SendKeys("cheryltest123");//escribe usuario
+            Driver.FindElement(By.Id("loginFrm_password")).SendKeys("Password123");//escribe contraseña
+            Driver.FindElement(By.CssSelector("button[title='Login']")).Click();//presiona login
 
+
+            //Valida que el login fue exitoso
+            //confirmando que el título de la
+            //página contenga "account",
+            //lo que indicaría que se redirigió
+            //a la página de cuenta del usuario
             Assert.That(
                 Driver.Title.ToLower(),
                 Does.Contain("account"),
@@ -554,13 +645,15 @@ namespace AutomationTestStore.Tests.Tests
 
             LogStep("Search product and add to cart");
 
-            var home = new HomePage(Driver)
+            var home = new HomePage(Driver)//vuelve a la página principal
                 .GoTo(TestConfig.Instance.BaseUrl)
-                .Search("shampoo");
+                .Search("shampoo"); //busca el producto shampoo
 
-            var product = home.OpenFirstProduct();
-            var cart = product.AddToCart();
+            var product = home.OpenFirstProduct();//abre el primer resultado
+            var cart = product.AddToCart();//lo agrega al carrito
 
+            //Valida que el producto sí fue agregado
+            //y que el carrito se muestra correctamente
             Assert.That(
                 cart.IsCartVisible(),
                 Is.True,
@@ -571,78 +664,119 @@ namespace AutomationTestStore.Tests.Tests
 
             LogStep("Open Shopping Cart page");
 
+            //El test navega directamente a la URL del carrito.
             Driver.Navigate().GoToUrl($"{TestConfig.Instance.BaseUrl}/index.php?rt=checkout/cart");
+            //Esto asegura que el flujo se posicione
+            //exactamente en la pantalla donde
+            //se quiere trabajar: el carrito.
 
+            //Valida que el título de la página corresponda al carrito.
             Assert.That(
                 Driver.Title.ToLower(),
                 Does.Contain("shopping cart").Or.Contain("cart"),
                 "No abrió Shopping Cart."
             );
 
+            //Leer el total inicial del carrito
             LogStep("Read initial cart total");
 
-            decimal ReadTotal()
+            decimal ReadTotal()//Busca en la página el total del carrito,
+                               //extrae el texto, limpia símbolos y
+                               //trata de convertirlo a número decimal
             {
-                var candidates = Driver.FindElements(By.XPath(
+                //Busca posibles elementos donde esté el total
+                var candidates = Driver.FindElements(By.XPath(//Usa XPath para encontrar algo asociado a la palabra total y el precio siguiente.
                     "//*[contains(translate(normalize-space(.),'TOTAL','total'),'total')]/following::span[contains(@class,'price')][1] | " +
                     "//*[contains(translate(normalize-space(.),'TOTAL','total'),'total')]/following::td[1]"
-                ));
+                ));//Si no encuentra ese elemento, prueba con otros selectores
+                   //más genéricos, buscando el último precio
+                   //visible en la página como respaldo.
 
-                var raw = candidates.FirstOrDefault()?.Text ?? "";
+                //Prueba con otro enfoque
+                var raw = candidates.FirstOrDefault()?.Text ?? "";//Toma el texto del primer
+                                                                  //candidato encontrado, o
+                                                                  //una cadena vacía si no
+                                                                  //encuentra ninguno.
 
                 if (string.IsNullOrWhiteSpace(raw))
                 {
-                    var prices = Driver.FindElements(By.CssSelector("span.price"));
-                    raw = prices.LastOrDefault()?.Text ?? "";
-                }
+                    var prices = Driver.FindElements(By.CssSelector("span.price"));//Si no encuentra el total con el método
+                                                                                   //anterior, busca todos los elementos
+                                                                                   //que tengan la clase price y toma el
+                                                                                   //último visible como posible total.
+                    raw = prices.LastOrDefault()?.Text ?? "";//Limpia el texto
+                }//quita $, US, comas, espacios para tratar de dejar solo el número
 
                 raw = raw.Replace("$", "").Replace("US", "").Replace(",", "").Trim();
 
-                if (decimal.TryParse(raw,
-                        System.Globalization.NumberStyles.Any,
-                        System.Globalization.CultureInfo.InvariantCulture,
-                        out var val))
-                    return val;
+                if (decimal.TryParse(raw,//Intenta convertir el texto limpio a decimal usando la cultura invariante
+                        System.Globalization.NumberStyles.Any,//Permite cualquier formato numérico común, como decimales, miles, etc
+                        System.Globalization.CultureInfo.InvariantCulture,//Usa la cultura estándar para evitar problemas con formatos numéricos específicos de cada región
+                        out var val))//Si la conversión es exitosa, devuelve el valor decimal
+                    return val;//Si no se pudo convertir, intenta con la cultura de Costa Rica, que es común en esta tienda
 
                 if (decimal.TryParse(raw,
                         System.Globalization.NumberStyles.Any,
-                        new System.Globalization.CultureInfo("es-CR"),
+                        new System.Globalization.CultureInfo("es-CR"),//Si no funciona, prueba con:es-CR
                         out val))
                     return val;
 
-                Console.WriteLine("No se pudo parsear TOTAL. RAW=" + raw);
-                return -1m;
-            }
+                Console.WriteLine("No se pudo parsear TOTAL. RAW=" + raw);//Si no puede parsearlo
+                return -1m;//devuelve -1 para indicar que no se pudo obtener un total válido
+            }//Eso significa: no pude leer el total correctamente
 
             var totalBefore = ReadTotal();
             LogInfo("TOTAL BEFORE: " + totalBefore);
+            //Lee el total antes de modificar la cantidad
+            //y lo guarda para compararlo después.
 
+
+            //Busca el input de cantidad del producto en el carrito.
             LogStep("Update quantity to 2");
 
             var qtyInput = Driver.FindElements(By.XPath("//input[contains(@name,'quantity')]"))
                 .FirstOrDefault(e => e.Displayed && e.Enabled);
 
+            //Luego valida que sí exista ese input, lo limpie
+            //y escriba el número 2 para actualizar la cantidad
+            //a 2 unidades del producto
             Assert.That(qtyInput, Is.Not.Null, "No se encontró input de cantidad en el carrito.");
 
-            qtyInput!.Clear();
-            qtyInput.SendKeys("2");
+            qtyInput!.Clear();//Después borra el valor anterior 
+            qtyInput.SendKeys("2");//y luego escribe 2
 
             LogStep("Click Update button");
 
+            //Buscar y hacer clic en Update
+            //Aquí lo que hace es buscar el botón Update
+            //en distintas formas posibles:
+            //botón
+            //input
+            //enlace
             var updateBtn = Driver.FindElements(By.XPath(
                 "//button[contains(.,'Update') or contains(@title,'Update')] | " +
                 "//input[@value='Update' or contains(@title,'Update')] | " +
                 "//a[contains(.,'Update')]"
             )).FirstOrDefault(e => e.Displayed && e.Enabled);
+            //lo hace así oorque dependiendo del HTML
+            //real del sitio, el botón podría estar
+            //implementado distinto
 
+
+            //Valida que el botón Update exista y esté visible y habilitado
             Assert.That(updateBtn, Is.Not.Null, "No se encontró botón Update en el carrito.");
 
-            updateBtn!.Click();
+            updateBtn!.Click();//Si el botón existe, hace clic para actualizar la cantidad.
 
             LogStep("Wait for quantity update");
 
             var waitQty = new WebDriverWait(Driver, TimeSpan.FromSeconds(20));
 
+
+            //Después de hacer clic en Update,
+            //el test espera hasta que el
+            //valor del input de cantidad
+            //se actualice a 2.
             waitQty.Until(d =>
             {
                 try
@@ -652,41 +786,43 @@ namespace AutomationTestStore.Tests.Tests
 
                     if (input == null) return false;
 
-                    return input.GetAttribute("value") == "2";
+                    return input.GetAttribute("value") == "2";//Espera hasta que el input de cantidad realmente tenga valor "2".
                 }
-                catch (StaleElementReferenceException)
+                catch (StaleElementReferenceException)//Porque al actualizarse el carrito, Selenium puede perder la referencia al elemento viejo.Entonces el test vuelve a intentar.
                 {
                     return false;
                 }
             });
 
-            LogStep("Read updated total");
+            LogStep("Read updated total");//Después de hacer clic en Update, el cambio puede tardar unos segundos.
 
-            decimal TryReadCartTotal()
+            decimal TryReadCartTotal()//Intenta leer otra vez el total del carrito, usando selectores CSS.
             {
-                var totalEl = Driver.FindElements(By.CssSelector(
-                    ".total .price, #totals_table .price, .cart_total .price, .cart-info .price, span.price"
+                var totalEl = Driver.FindElements(By.CssSelector(//busca elementos como:
+                    ".total .price, #totals_table .price, .cart_total .price, .cart-info .price, span.price"//estos selectores
                 )).LastOrDefault();
 
                 var raw = totalEl?.Text ?? "";
 
                 raw = raw.Replace("$", "").Replace("US", "").Replace(",", "").Trim();
 
-                if (decimal.TryParse(raw,
+                if (decimal.TryParse(raw,////Luego limpia el texto y trata de convertirlo a decimal.
                     System.Globalization.NumberStyles.Any,
                     System.Globalization.CultureInfo.InvariantCulture,
                     out var val))
                     return val;
 
-                return -1m;
+                return -1m;//Si no puede, devuelve -1.
             }
 
-            var totalAfterUpdate = TryReadCartTotal();
+            var totalAfterUpdate = TryReadCartTotal();//Luego el test compara dos escenarios:
 
+            //Escenario A: sí se pudieron leer ambos totales
             LogInfo("TOTAL AFTER UPDATE: " + totalAfterUpdate);
 
-            if (totalBefore >= 0 && totalAfterUpdate >= 0)
+            if (totalBefore >= 0 && totalAfterUpdate >= 0)//Valida que el total nuevo sea distinto al anterior:
             {
+                //significa que si la cantidad subió de 1 a 2, el total debería cambiar
                 Assert.That(
                     totalAfterUpdate,
                     Is.Not.EqualTo(totalBefore),
@@ -694,23 +830,27 @@ namespace AutomationTestStore.Tests.Tests
                 );
             }
             else
-            {
+            {//Escenario B: no se pudieron leer bien los totales
                 var qtyAfter = Driver.FindElements(By.XPath("//input[contains(@name,'quantity')]"))
                     .FirstOrDefault(e => e.Displayed);
-
                 Assert.That(qtyAfter, Is.Not.Null, "No se encontró el input de cantidad después del Update.");
 
                 Assert.That(
                     qtyAfter!.GetAttribute("value"),
-                    Is.EqualTo("2"),
+                    Is.EqualTo("2"),////Y valida que el input realmente tenga valor "2".
                     "La cantidad no quedó en 2 luego de actualizar."
-                );
+                );//significa que aunque no se pudo leer el total,
+                  //al menos sí se actualizó la cantidad a 2,
+                  //lo cual es un indicador de que el proceso de
+                  //actualización sí funcionó aunque no se pueda
+                  //validar el total.
             }
 
             LogPass("Quantity update validated.");
 
             LogStep("Remove product from cart");
 
+            //Busca un botón de eliminar usando varias posibilidades:
             var removeBtn = Driver.FindElements(By.XPath(
                 "//a[contains(@title,'Remove') or contains(@title,'Delete') or contains(@href,'remove') or contains(@href,'delete')] | " +
                 "//button[contains(.,'Remove') or contains(.,'Delete')]"
@@ -718,7 +858,11 @@ namespace AutomationTestStore.Tests.Tests
 
             Assert.That(removeBtn, Is.Not.Null, "No se encontró botón Remove/Delete.");
 
-            removeBtn!.Click();
+            removeBtn!.Click();//Luego hace clic.
+            //es muy grande el método porque contempla muchas posibilidades
+            //de cómo el sitio podría estar implementando el botón de eliminar
+            //producto del carrito, y también contempla distintos escenarios
+            //para validar la actualización de cantidad y el cambio en el total
 
             LogStep("Wait for empty cart state");
 
@@ -726,43 +870,49 @@ namespace AutomationTestStore.Tests.Tests
 
             waitEmpty.Until(d =>
             {
-                var html = d.PageSource.ToLower();
+                var html = d.PageSource.ToLower();//Espera hasta que se cumpla alguna de estas condiciones:
 
-                return html.Contains("your shopping cart is empty")
-                    || html.Contains("shopping cart is empty")
-                    || d.FindElements(By.XPath("//input[contains(@name,'quantity')]")).Count == 0;
-            });
+                return html.Contains("your shopping cart is empty")//aparece texto indicando que el carrito está vacío
+                    || d.FindElements(By.XPath("//input[contains(@name,'quantity')]")).Count == 0;//ya no existen inputs de cantidad
+            });//Esto indica Porque no depende de una sola señal;
+               //usa varias formas de confirmar que el carrito quedó vacío.
 
+
+            //Valida que la página muestre evidencia de que el carrito está vacío
             Assert.That(
                 Driver.PageSource.ToLower(),
                 Does.Contain("empty").Or.Contain("shopping cart"),
                 "No se detectó estado de carrito vacío."
             );
 
+            //Si todo sale bien, el test registra que el producto
+            //fue removido correctamente y el carrito quedó vacío.
             LogPass("Cart is empty after removing product.");
         }
 
         [Test]
-        [Category("Cart")]
+        [Category("Cart")]//Clasifica el test dentro del módulo de carrito de compras.
         public void Cart_RemoveProduct_ShouldLeaveCartEmpty()
         {
             LogStep("Search product 'shampoo' from homepage");
 
-            var home = new HomePage(Driver!)
+            var home = new HomePage(Driver!)//abre la página principal
                 .GoTo(TestConfig.Instance.BaseUrl)
-                .Search("shampoo");
+                .Search("shampoo");//busca el producto shampoo
 
             LogStep("Open first product from search results");
 
             var product = home.OpenFirstProduct();
-
+            //Abre el primer producto que aparece en los resultados de búsqueda.
             LogStep("Add product to cart");
 
             var cart = product.AddToCart();
+            //Presiona el botón Add to Cart
 
+            //Valida que el carrito sea visible después de agregar el producto.
             Assert.That(
                 cart.IsCartVisible(),
-                Is.True,
+                Is.True,//Esto confirma que el producto se añadió correctamente.
                 "El carrito no se mostró."
             );
 
@@ -771,38 +921,45 @@ namespace AutomationTestStore.Tests.Tests
             LogStep("Remove product from cart");
 
             cart.RemoveFirstItem();
+            //Ese método hace clic en el botón Remove / Delete del carrito.
 
             LogStep("Validate cart is empty");
 
+            //Valida que el carrito esté vacío después de eliminar el producto.
             Assert.That(
                 cart.IsCartEmpty(),
-                Is.True,
+                Is.True,//Lo confirma
                 "El carrito no quedó vacío luego de eliminar el producto."
             );
 
             LogPass("Cart is empty after removing product.");
-        }
+        }//Si la validación pasa, el test registra que el carrito quedó vacío correctamente.
 
         [Test]
-        [Category("Navigation")]
+        [Category("Navigation")]//Clasifica el test dentro de las pruebas de navegación del sitio
         public void Category_Navigation_And_ProductDetails_ShouldSucceed()
         {
             LogStep("Open homepage and navigate to Skincare category");
 
             var category = new CategoryPage(Driver!)
-                .GoToHome(TestConfig.Instance.BaseUrl)
-                .OpenCategoryByText("Skincare");
+                .GoToHome(TestConfig.Instance.BaseUrl)//abre la página principal
+                .OpenCategoryByText("Skincare");//navega a la categoría Skincare
 
             LogStep("Open first product from category");
 
+            //abre el primer producto que aparece dentro de la categoría Skincare
             var product = category.OpenFirstProductFromCategory();
 
             LogStep("Get product name from product details page");
+            //Una vez abierta la página de detalles del producto,
+            //el test obtiene el nombre del producto
+            var productName = product.GetName();//Ese nombre se extrae del DOM de la página.
+            //puede ser Seaweed Conditioner o Aloe Vera Cream
+            LogInfo("PRODUCT NAME: " + productName);//Guarda el nombre en los logs del test.
+            //ayuda con el debugging y revisar que producto se abrió realmente
 
-            var productName = product.GetName();
 
-            LogInfo("PRODUCT NAME: " + productName);
-
+            //valida que el nombre del producto no esté vacío
             Assert.That(
                 productName,
                 Is.Not.Empty,
@@ -810,6 +967,7 @@ namespace AutomationTestStore.Tests.Tests
             );
 
             LogPass("Product details page loaded successfully.");
-        }
+        }//Si todo funciona, el test registra que la página de
+         //detalles del producto se cargó correctamente
     }
 }

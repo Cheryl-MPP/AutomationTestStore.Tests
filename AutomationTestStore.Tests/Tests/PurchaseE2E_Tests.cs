@@ -1,7 +1,16 @@
 ﻿using AutomationTestStore.Tests.Config;
 using AutomationTestStore.Tests.Pages;
+using AutomationTestStore.Tests.Reports;
+using Deque.AxeCore.Selenium;
 using OpenQA.Selenium;
 using OpenQA.Selenium.Support.UI;
+using System.Text;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using AventStack.ExtentReports.MarkupUtils;
+
 
 
 namespace AutomationTestStore.Tests.Tests
@@ -969,5 +978,171 @@ namespace AutomationTestStore.Tests.Tests
             LogPass("Product details page loaded successfully.");
         }//Si todo funciona, el test registra que la página de
          //detalles del producto se cargó correctamente
+
+        [Test]
+        [Category("Accessibility")]
+        public void HomePage_Accessibility_ShouldGenerateHtmlReport()
+        {
+            LogStep("Open homepage for accessibility scan");
+            Driver!.Navigate().GoToUrl(TestConfig.Instance.BaseUrl);
+
+
+            LogStep("Run accessibility scan using Axe");
+            var axe = new Deque.AxeCore.Selenium.AxeBuilder(Driver).Analyze();
+            var violations = axe.Violations;
+
+            var totalCount = violations.Length;
+
+            var criticalCount = violations.Count(v =>
+                !string.IsNullOrWhiteSpace(v.Impact) &&
+                v.Impact.Equals("critical", StringComparison.OrdinalIgnoreCase));
+
+            var seriousCount = violations.Count(v =>
+                !string.IsNullOrWhiteSpace(v.Impact) &&
+                v.Impact.Equals("serious", StringComparison.OrdinalIgnoreCase));
+
+            var moderateCount = violations.Count(v =>
+                !string.IsNullOrWhiteSpace(v.Impact) &&
+                v.Impact.Equals("moderate", StringComparison.OrdinalIgnoreCase));
+
+            var minorCount = violations.Count(v =>
+                !string.IsNullOrWhiteSpace(v.Impact) &&
+                v.Impact.Equals("minor", StringComparison.OrdinalIgnoreCase));
+
+            LogInfo($"Accessibility summary -> Total: {totalCount}, Critical: {criticalCount}, Serious: {seriousCount}, Moderate: {moderateCount}, Minor: {minorCount}");
+
+            var rows = new List<string[]>
+    {
+        new[] { "Rule", "Impact", "Description", "Help" }
+    };
+
+            foreach (var violation in violations)
+            {
+                rows.Add(new[]
+                {
+                    violation.Id ?? "",
+                    violation.Impact ?? "unknown",
+                    violation.Description ?? "",
+                    violation.Help ?? ""
+                });
+
+            }
+
+            var tableData = rows.ToArray();
+
+            ExtentTestManager.GetTest().Info(
+                AventStack.ExtentReports.MarkupUtils.MarkupHelper.ToTable<string[][]>(rows.ToArray())
+            );
+
+            var resultsDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "TestResults");
+            Directory.CreateDirectory(resultsDir);
+
+            var reportPath = Path.Combine(resultsDir, "AccessibilityReport.html");
+
+            string GetImpactClass(string? impact)
+            {
+                if (string.IsNullOrWhiteSpace(impact)) return "impact-unknown";
+
+                return impact.ToLowerInvariant() switch
+                {
+                    "critical" => "impact-critical",
+                    "serious" => "impact-serious",
+                    "moderate" => "impact-moderate",
+                    "minor" => "impact-minor",
+                    _ => "impact-unknown"
+                };
+            }
+
+            var html = new StringBuilder();
+
+            html.AppendLine("<!DOCTYPE html>");
+            html.AppendLine("<html lang='en'>");
+            html.AppendLine("<head>");
+            html.AppendLine("    <meta charset='UTF-8'>");
+            html.AppendLine("    <meta name='viewport' content='width=device-width, initial-scale=1.0'>");
+            html.AppendLine("    <title>Accessibility Report</title>");
+            html.AppendLine("    <style>");
+            html.AppendLine("        body { font-family: Arial, sans-serif; background: #f5f7fb; color: #1f2937; margin: 0; padding: 0; }");
+            html.AppendLine("        .container { max-width: 1200px; margin: 30px auto; background: #ffffff; border-radius: 14px; box-shadow: 0 4px 18px rgba(0,0,0,0.08); padding: 28px; }");
+            html.AppendLine("        h1 { margin: 0 0 8px 0; font-size: 32px; color: #111827; }");
+            html.AppendLine("        .subtitle { color: #6b7280; margin-bottom: 24px; }");
+            html.AppendLine("        .summary { display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 28px; }");
+            html.AppendLine("        .card { flex: 1 1 180px; min-width: 180px; border-radius: 12px; padding: 18px; color: white; }");
+            html.AppendLine("        .card h2 { margin: 0; font-size: 28px; }");
+            html.AppendLine("        .card p { margin: 6px 0 0 0; font-size: 14px; }");
+            html.AppendLine("        .total { background: #2563eb; }");
+            html.AppendLine("        .critical { background: #b91c1c; }");
+            html.AppendLine("        .serious { background: #dc2626; }");
+            html.AppendLine("        .moderate { background: #d97706; }");
+            html.AppendLine("        .minor { background: #059669; }");
+            html.AppendLine("        table { width: 100%; border-collapse: collapse; margin-top: 10px; }");
+            html.AppendLine("        th, td { padding: 12px 14px; border-bottom: 1px solid #e5e7eb; text-align: left; vertical-align: top; }");
+            html.AppendLine("        th { background: #111827; color: white; font-size: 14px; }");
+            html.AppendLine("        tr:hover { background: #f9fafb; }");
+            html.AppendLine("        .badge { display: inline-block; padding: 6px 10px; border-radius: 999px; font-size: 12px; font-weight: bold; color: white; text-transform: uppercase; letter-spacing: 0.5px; }");
+            html.AppendLine("        .impact-critical { background: #b91c1c; }");
+            html.AppendLine("        .impact-serious { background: #dc2626; }");
+            html.AppendLine("        .impact-moderate { background: #d97706; }");
+            html.AppendLine("        .impact-minor { background: #059669; }");
+            html.AppendLine("        .impact-unknown { background: #6b7280; }");
+            html.AppendLine("        .footer { margin-top: 26px; color: #6b7280; font-size: 13px; }");
+            html.AppendLine("        .mono { font-family: Consolas, monospace; }");
+            html.AppendLine("    </style>");
+            html.AppendLine("</head>");
+            html.AppendLine("<body>");
+            html.AppendLine("    <div class='container'>");
+            html.AppendLine("        <h1>Accessibility Scan Report</h1>");
+            html.AppendLine($"        <div class='subtitle'>Generated on {DateTime.Now:yyyy-MM-dd HH:mm:ss}</div>");
+
+            html.AppendLine("        <div class='summary'>");
+            html.AppendLine($"            <div class='card total'><h2>{totalCount}</h2><p>Total Violations</p></div>");
+            html.AppendLine($"            <div class='card critical'><h2>{criticalCount}</h2><p>Critical</p></div>");
+            html.AppendLine($"            <div class='card serious'><h2>{seriousCount}</h2><p>Serious</p></div>");
+            html.AppendLine($"            <div class='card moderate'><h2>{moderateCount}</h2><p>Moderate</p></div>");
+            html.AppendLine($"            <div class='card minor'><h2>{minorCount}</h2><p>Minor</p></div>");
+            html.AppendLine("        </div>");
+
+            html.AppendLine("        <table>");
+            html.AppendLine("            <thead>");
+            html.AppendLine("                <tr>");
+            html.AppendLine("                    <th>Rule</th>");
+            html.AppendLine("                    <th>Impact</th>");
+            html.AppendLine("                    <th>Description</th>");
+            html.AppendLine("                    <th>Help</th>");
+            html.AppendLine("                </tr>");
+            html.AppendLine("            </thead>");
+            html.AppendLine("            <tbody>");
+
+            foreach (var violation in violations)
+            {
+                var impact = violation.Impact ?? "unknown";
+                var impactClass = GetImpactClass(impact);
+
+                html.AppendLine("                <tr>");
+                html.AppendLine($"                    <td class='mono'>{System.Net.WebUtility.HtmlEncode(violation.Id)}</td>");
+                html.AppendLine($"                    <td><span class='badge {impactClass}'>{System.Net.WebUtility.HtmlEncode(impact)}</span></td>");
+                html.AppendLine($"                    <td>{System.Net.WebUtility.HtmlEncode(violation.Description)}</td>");
+                html.AppendLine($"                    <td>{System.Net.WebUtility.HtmlEncode(violation.Help)}</td>");
+                html.AppendLine("                </tr>");
+            }
+
+            html.AppendLine("            </tbody>");
+            html.AppendLine("        </table>");
+
+            html.AppendLine("        <div class='footer'>");
+            html.AppendLine("            Report generated automatically using Selenium + Axe Core.");
+            html.AppendLine("        </div>");
+            html.AppendLine("    </div>");
+            html.AppendLine("</body>");
+            html.AppendLine("</html>");
+
+            File.WriteAllText(reportPath, html.ToString());
+
+            LogInfo("Accessibility HTML report generated successfully.");
+            LogInfo("ACCESSIBILITY REPORT: " + reportPath);
+
+            Assert.Pass("Accessibility scan completed. HTML report generated successfully.");
+        }
+
     }
 }

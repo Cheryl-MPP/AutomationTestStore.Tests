@@ -1,15 +1,16 @@
 ﻿using AutomationTestStore.Tests.Config;
 using AutomationTestStore.Tests.Pages;
 using AutomationTestStore.Tests.Reports;
+using AventStack.ExtentReports.MarkupUtils;
 using Deque.AxeCore.Selenium;
 using OpenQA.Selenium;
 using OpenQA.Selenium.Support.UI;
-using System.Text;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using AventStack.ExtentReports.MarkupUtils;
+using System.Text;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 
 
@@ -983,41 +984,73 @@ namespace AutomationTestStore.Tests.Tests
         [Category("Accessibility")]
         public void HomePage_Accessibility_ShouldGenerateHtmlReport()
         {
+
+            // Registra en el log que se va a abrir la página principal para el escaneo
             LogStep("Open homepage for accessibility scan");
+            //Primero se abre la página principal usando
+            //la URL base configurada en el proyecto y después
+            //se usa AxeBuilder, que pertenece a Axe Core,
+            //para analizar la página cargada y devolver
+            //las violaciones de accesibilidad detectadas.
+
+
+            // Navega a la URL base configurada en TestConfig
             Driver!.Navigate().GoToUrl(TestConfig.Instance.BaseUrl);
 
-
+            // Registra en el log que se iniciará el análisis de accesibilidad con Axe
             LogStep("Run accessibility scan using Axe");
+
+            // Ejecuta el análisis de accesibilidad sobre la página cargada
             var axe = new Deque.AxeCore.Selenium.AxeBuilder(Driver).Analyze();
+
+            // Obtiene la lista de violaciones encontradas por Axe
             var violations = axe.Violations;
 
+            // Calcula la cantidad total de violaciones encontradas
             var totalCount = violations.Length;
+            //Aquí se calcula cuántas violaciones hay en total
+            //y también cuántas pertenecen a cada nivel de
+            //impacto: critical, serious, moderate y minor
+            //Esto permite tener un resumen más claro de
+            //la gravedad de los problemas encontrados.
 
+
+            // Cuenta cuántas violaciones tienen impacto "critical"
             var criticalCount = violations.Count(v =>
                 !string.IsNullOrWhiteSpace(v.Impact) &&
                 v.Impact.Equals("critical", StringComparison.OrdinalIgnoreCase));
 
+            // Cuenta cuántas violaciones tienen impacto "serious"
             var seriousCount = violations.Count(v =>
                 !string.IsNullOrWhiteSpace(v.Impact) &&
                 v.Impact.Equals("serious", StringComparison.OrdinalIgnoreCase));
 
+            // Cuenta cuántas violaciones tienen impacto "moderate"
             var moderateCount = violations.Count(v =>
                 !string.IsNullOrWhiteSpace(v.Impact) &&
                 v.Impact.Equals("moderate", StringComparison.OrdinalIgnoreCase));
 
+            // Cuenta cuántas violaciones tienen impacto "minor"
             var minorCount = violations.Count(v =>
                 !string.IsNullOrWhiteSpace(v.Impact) &&
                 v.Impact.Equals("minor", StringComparison.OrdinalIgnoreCase));
 
+            // Registra en el log un resumen general de resultados.
             LogInfo($"Accessibility summary -> Total: {totalCount}, Critical: {criticalCount}, Serious: {seriousCount}, Moderate: {moderateCount}, Minor: {minorCount}");
 
+            // Crea una lista de filas para construir una tabla con los resultados.
             var rows = new List<string[]>
-    {
-        new[] { "Rule", "Impact", "Description", "Help" }
-    };
-
+            {
+                new[] { "Rule", "Impact", "Description", "Help" }
+            };
+            // Recorre cada violación encontrada para agregarla a la tabla y 
+            //Después se crea una lista de filas para construir
+            //una tabla con la información de cada violación.
             foreach (var violation in violations)
             {
+                //Por cada hallazgo se guardan cuatro datos principales:
+                //la regla que falló, el nivel de impacto,
+                //la descripción del problema y una ayuda o recomendación.
                 rows.Add(new[]
                 {
                     violation.Id ?? "",
@@ -1027,22 +1060,35 @@ namespace AutomationTestStore.Tests.Tests
                 });
 
             }
-
+            // Convierte la lista de filas en arreglo.
             var tableData = rows.ToArray();
 
+            // Agrega la tabla al reporte de ExtentReports para verla en el log de pruebas
+            //Además del archivo HTML, también se agrega una tabla al reporte de
+            //ejecución de pruebas usando ExtentReports.
             ExtentTestManager.GetTest().Info(
                 AventStack.ExtentReports.MarkupUtils.MarkupHelper.ToTable<string[][]>(rows.ToArray())
-            );
+            );//Eso permite ver los resultados directamente dentro del reporte del framework de testing.
 
+
+            // Define la carpeta donde se guardará el reporte HTML.
             var resultsDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "TestResults");
+            // Crea la carpeta si no existe.
             Directory.CreateDirectory(resultsDir);
-
+            // Define la ruta completa del archivo HTML
             var reportPath = Path.Combine(resultsDir, "AccessibilityReport.html");
 
+
+            // Función local para asignar una clase CSS según el nivel de impacto,
+            //gracias a eso, cada severidad se muestra con un color diferente
+            //dentro del reporte HTML, lo que hace más fácil identificar
+            //los problemas más graves.
             string GetImpactClass(string? impact)
             {
+                // Si el impacto viene vacío o nulo, usa una clase por defecto
                 if (string.IsNullOrWhiteSpace(impact)) return "impact-unknown";
 
+                // Retorna una clase CSS distinta para cada severidad
                 return impact.ToLowerInvariant() switch
                 {
                     "critical" => "impact-critical",
@@ -1052,6 +1098,14 @@ namespace AutomationTestStore.Tests.Tests
                     _ => "impact-unknown"
                 };
             }
+
+            // StringBuilder permite construir el HTML de manera eficiente
+            //Esto se contruye manualmente para tener control total sobre
+            //el diseño y formato del reporte, y se le van agregando
+            //líneas de HTML para formar la estructura completa del
+            //documento.Se define la estructura del documento,
+            //estilos CSS, tarjetas de resumen y una tabla
+            //con el detalle de cada violación. 
 
             var html = new StringBuilder();
 
@@ -1091,9 +1145,10 @@ namespace AutomationTestStore.Tests.Tests
             html.AppendLine("</head>");
             html.AppendLine("<body>");
             html.AppendLine("    <div class='container'>");
-            html.AppendLine("        <h1>Accessibility Scan Report</h1>");
+            // Título y fecha/hora de generación del reporte.
+            html.AppendLine("        <h1>Accessibility Scan Report</h1>");//El título del reporte
             html.AppendLine($"        <div class='subtitle'>Generated on {DateTime.Now:yyyy-MM-dd HH:mm:ss}</div>");
-
+            // Sección de tarjetas resumen con la cantidad por severidad.
             html.AppendLine("        <div class='summary'>");
             html.AppendLine($"            <div class='card total'><h2>{totalCount}</h2><p>Total Violations</p></div>");
             html.AppendLine($"            <div class='card critical'><h2>{criticalCount}</h2><p>Critical</p></div>");
@@ -1101,7 +1156,7 @@ namespace AutomationTestStore.Tests.Tests
             html.AppendLine($"            <div class='card moderate'><h2>{moderateCount}</h2><p>Moderate</p></div>");
             html.AppendLine($"            <div class='card minor'><h2>{minorCount}</h2><p>Minor</p></div>");
             html.AppendLine("        </div>");
-
+            // Inicio de la tabla detallada.
             html.AppendLine("        <table>");
             html.AppendLine("            <thead>");
             html.AppendLine("                <tr>");
@@ -1112,12 +1167,17 @@ namespace AutomationTestStore.Tests.Tests
             html.AppendLine("                </tr>");
             html.AppendLine("            </thead>");
             html.AppendLine("            <tbody>");
-
+            // Recorre nuevamente las violaciones para agregarlas al HTML
             foreach (var violation in violations)
             {
                 var impact = violation.Impact ?? "unknown";
                 var impactClass = GetImpactClass(impact);
-
+                //Antes de insertar texto dentro del HTML,
+                //se usa HtmlEncode para evitar que
+                //caracteres especiales rompan la
+                //estructura del reporte eso también
+                //ayuda a mostrar el contenido de
+                //forma segura y correcta (System.Net.WebUtility.HtmlEncode)
                 html.AppendLine("                <tr>");
                 html.AppendLine($"                    <td class='mono'>{System.Net.WebUtility.HtmlEncode(violation.Id)}</td>");
                 html.AppendLine($"                    <td><span class='badge {impactClass}'>{System.Net.WebUtility.HtmlEncode(impact)}</span></td>");
@@ -1128,7 +1188,7 @@ namespace AutomationTestStore.Tests.Tests
 
             html.AppendLine("            </tbody>");
             html.AppendLine("        </table>");
-
+            // Pie del reporte.
             html.AppendLine("        <div class='footer'>");
             html.AppendLine("            Report generated automatically using Selenium + Axe Core.");
             html.AppendLine("        </div>");
@@ -1136,11 +1196,23 @@ namespace AutomationTestStore.Tests.Tests
             html.AppendLine("</body>");
             html.AppendLine("</html>");
 
+            // Guarda el contenido HTML en el archivo físico
+            //Cuando el HTML ya está completo, se guarda
+            //físicamente en un archivo llamado
+            //AccessibilityReport.html dentro
+            //de la carpeta TestResults.
             File.WriteAllText(reportPath, html.ToString());
-
+            // Registra en el log que el reporte se creó correctamente.
             LogInfo("Accessibility HTML report generated successfully.");
             LogInfo("ACCESSIBILITY REPORT: " + reportPath);
 
+            // Finaliza la prueba como exitosa
+            //Finalmente, la prueba se marca como
+            //exitosa porque el objetivo de este
+            //test no es fallar si existen
+            //violaciones, sino completar el
+            //análisis y generar el reporte
+            //correctamente.
             Assert.Pass("Accessibility scan completed. HTML report generated successfully.");
         }
 
